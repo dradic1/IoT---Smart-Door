@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Door</title>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #000;
+            font-family: Arial, sans-serif;
+        }
+        .container {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            text-align: left;
+            width: 300px;
+        }
+        .container h1 {
+            font-size: 24px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .status {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 15px;
+        }
+        .status span {
+            font-size: 16px;
+        }
+        .icon-and-label {
+            display: flex;
+            align-items: center;
+        }
+        .icon {
+            margin-right: 10px;
+        }
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 34px;
+            height: 20px;
+        }
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #ccc;
+            border-radius: 20px;
+        }
+        .slider::before {
+            position: absolute;
+            content: "";
+            height: 14px; width: 14px;
+            left: 3px; bottom: 3px;
+            background-color: white;
+            border-radius: 50%;
+            transition: .4s;
+        }
+        input:checked + .slider {
+            background-color: #2196F3; /* Blue color when checked */
+        }
+        input:checked + .slider::before {
+            transform: translateX(14px);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Smart Door</h1>
+
+        <!-- Door -->
+        <div class="status">
+            <div class="icon-and-label">
+                <span class="icon">🚪</span>
+                <span>Door:</span>
+            </div>
+            <div>
+                <span id="doorStatus">CLOSED</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="doorSwitch">
+                    <span class="slider"></span>
+                </label>
+            </div>
+        </div>
+
+        <!-- RFID -->
+        <div class="status">
+            <div class="icon-and-label">
+                <span class="icon">📶</span>
+                <span>RFID:</span>
+            </div>
+            <span id="rfidStatus">NOT DETECTED</span>
+        </div>
+
+        <!-- Motion -->
+        <div class="status">
+            <div class="icon-and-label">
+                <span class="icon">🚶‍♂️</span>
+                <span>Motion:</span>
+            </div>
+            <span id="motionStatus">NOT DETECTED</span>
+        </div>
+
+        <!-- LED -->
+        <div class="status">
+            <div class="icon-and-label">
+                <span class="icon">💡</span>
+                <span>LED:</span>
+            </div>
+            <div>
+                <span id="ledStatus">OFF</span>
+            </div>
+        </div>
+
+        <!-- Door Lock -->
+        <div class="status">
+            <div class="icon-and-label">
+                <span class="icon">🔒</span>
+                <span>Door:</span>
+            </div>
+            <div>
+                <span id="lockStatus">UNLOCKED</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="lockSwitch">
+                    <span class="slider"></span>
+                </label>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- JavaScript for handling WebSocket and UI updates -->
+    <script>
+        const ws = new WebSocket("ws://" + window.location.hostname + ":8888/ws");
+
+        ws.onopen = () => {
+            console.log("Connected to WebSocket server");
+        };
+
+        ws.onmessage = (event) => {
+            console.log("Message from server:", event.data);
+            handleMessage(event.data);
+        };
+
+        ws.onclose = () => {
+            console.log("WebSocket connection closed");
+        };
+
+        function handleMessage(message) {
+            if (message === "DOOR CLOSED") {
+                document.getElementById('ledStatus').textContent = 'OFF';
+                document.getElementById('doorStatus').textContent = 'CLOSED';
+                document.getElementById('doorSwitch').checked = false;
+                document.getElementById('rfidStatus').textContent = 'NOT DETECTED';
+            } else if (message === "DOOR OPEN") {
+                document.getElementById('ledStatus').textContent = 'ON';
+                document.getElementById('doorStatus').textContent = 'OPEN';
+                document.getElementById('doorSwitch').checked = true;
+            } else if (message === "Authorized access") {
+                document.getElementById('rfidStatus').textContent = 'DETECTED';
+            } else if (message === "Motion detected!") {
+                document.getElementById('motionStatus').textContent = 'DETECTED';
+            } else if (message === "Motion stopped!") {
+                document.getElementById('motionStatus').textContent = 'NOT DETECTED';
+            } else if (message === "DOOR LOCKED") {
+                document.getElementById('lockStatus').textContent = 'LOCKED';
+                document.getElementById('lockSwitch').checked = true;
+            } else if (message === "DOOR UNLOCKED") {
+                document.getElementById('lockStatus').textContent = 'UNLOCKED';
+                document.getElementById('lockSwitch').checked = false;
+            }
+        }
+
+        const doorSwitch = document.getElementById('doorSwitch');
+        const doorStatus = document.getElementById('doorStatus');
+
+        const lockSwitch = document.getElementById('lockSwitch');
+        const lockStatus = document.getElementById('lockStatus');
+
+        const ledStatus = document.getElementById('ledStatus');
+
+        // Change door status
+        doorSwitch.addEventListener('change', () => {
+            doorStatus.textContent = doorSwitch.checked ? 'OPEN' : 'CLOSED';
+            ws.send(doorSwitch.checked ? 'REMOTE DOOR OPEN' : 'REMOTE DOOR CLOSED');
+        });
+
+        // Change lock status
+        lockSwitch.addEventListener('change', () => {
+            lockStatus.textContent = lockSwitch.checked ? 'LOCKED' : 'UNLOCKED';
+            ws.send(lockSwitch.checked ? 'DOOR LOCKED' : 'DOOR UNLOCKED');
+        });
+
+    </script>
+</body>
+</html>
